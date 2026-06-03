@@ -1,0 +1,69 @@
+{
+  "board": {
+    "width_mm": 80,
+    "height_mm": 55,
+    "title": "Power Supply — 12V to 5V"
+  },
+  "components": [
+    {
+      "id": "J1",
+      "type": "connector",
+      "value": "12V-IN",
+      "pins": ["VIN", "GND"]
+    },
+    {
+      "id": "U1",
+      "type": "ic",
+      "value": "AMS1117-5.0",
+      "pins": ["IN", "OUT", "GND", "ADJ"]
+    },
+    {
+      "id": "C1",
+      "type": "capacitor",
+      "value": "100uF/25V",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "C2",
+      "type": "capacitor",
+      "value": "10uF/16V",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "D1",
+      "type": "led",
+      "value": "PWR-LED",
+      "pins": ["anode", "cathode"]
+    },
+    {
+      "id": "R1",
+      "type": "resistor",
+      "value": "1k",
+      "pins": ["A", "B"]
+    },
+    {
+      "id": "J2",
+      "type": "connector",
+      "value": "5V-OUT",
+      "pins": ["5V", "GND"]
+    }
+  ],
+  "nets": [
+    {
+      "name": "12V",
+      "connections": [["J1", "VIN"], ["U1", "IN"], ["C1", "pos"]]
+    },
+    {
+      "name": "5V",
+      "connections": [["U1", "OUT"], ["C2", "pos"], ["R1", "A"], ["J2", "5V"]]
+    },
+    {
+      "name": "GND",
+      "connections": [["J1", "GND"], ["U1", "GND"], ["C1", "neg"], ["C2", "neg"], ["D1", "cathode"], ["J2", "GND"]]
+    },
+    {
+      "name": "PWR_IND",
+      "connections": [["R1", "B"], ["D1", "anode"]]
+    }
+  ]
+}

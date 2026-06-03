@@ -1,0 +1,57 @@
+{
+  "board": {
+    "width_mm": 80,
+    "height_mm": 55,
+    "title": "LED Blink Circuit"
+  },
+  "components": [
+    {
+      "id": "U1",
+      "type": "ic",
+      "value": "ATmega328P",
+      "pins": ["VCC", "GND", "PB5", "PB4", "PB3", "PB2"]
+    },
+    {
+      "id": "R1",
+      "type": "resistor",
+      "value": "330R",
+      "pins": ["A", "B"]
+    },
+    {
+      "id": "D1",
+      "type": "led",
+      "value": "LED-RED",
+      "pins": ["anode", "cathode"]
+    },
+    {
+      "id": "C1",
+      "type": "capacitor",
+      "value": "100nF",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "J1",
+      "type": "connector",
+      "value": "USB-PWR",
+      "pins": ["VBUS", "GND", "D+", "D-"]
+    }
+  ],
+  "nets": [
+    {
+      "name": "VCC",
+      "connections": [["J1", "VBUS"], ["U1", "VCC"], ["C1", "pos"]]
+    },
+    {
+      "name": "GND",
+      "connections": [["J1", "GND"], ["U1", "GND"], ["C1", "neg"], ["D1", "cathode"]]
+    },
+    {
+      "name": "LED_LINE",
+      "connections": [["U1", "PB5"], ["R1", "A"]]
+    },
+    {
+      "name": "LED_ANODE",
+      "connections": [["R1", "B"], ["D1", "anode"]]
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "board": {
+    "width_mm": 80,
+    "height_mm": 55,
+    "title": "H-Bridge Motor Driver"
+  },
+  "components": [
+    {
+      "id": "U1",
+      "type": "ic",
+      "value": "L298N",
+      "pins": ["VCC", "GND", "IN1", "IN2", "IN3", "IN4", "OUT1", "OUT2"]
+    },
+    {
+      "id": "C1",
+      "type": "capacitor",
+      "value": "100nF",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "C2",
+      "type": "capacitor",
+      "value": "100uF",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "R1",
+      "type": "resistor",
+      "value": "10k",
+      "pins": ["A", "B"]
+    },
+    {
+      "id": "R2",
+      "type": "resistor",
+      "value": "10k",
+      "pins": ["A", "B"]
+    },
+    {
+      "id": "J1",
+      "type": "connector",
+      "value": "MOTOR-A",
+      "pins": ["M1+", "M1-"]
+    },
+    {
+      "id": "J2",
+      "type": "connector",
+      "value": "PWR-IN",
+      "pins": ["VM", "GND"]
+    },
+    {
+      "id": "J3",
+      "type": "connector",
+      "value": "CTRL-IN",
+      "pins": ["IN1", "IN2", "IN3", "IN4", "GND"]
+    }
+  ],
+  "nets": [
+    {
+      "name": "VM",
+      "connections": [["J2", "VM"], ["U1", "VCC"], ["C2", "pos"]]
+    },
+    {
+      "name": "GND",
+      "connections": [["J2", "GND"], ["U1", "GND"], ["C1", "neg"], ["C2", "neg"], ["J3", "GND"]]
+    },
+    {
+      "name": "IN1",
+      "connections": [["J3", "IN1"], ["R1", "A"], ["U1", "IN1"]]
+    },
+    {
+      "name": "IN2",
+      "connections": [["J3", "IN2"], ["R2", "A"], ["U1", "IN2"]]
+    },
+    {
+      "name": "OUT_A_P",
+      "connections": [["U1", "OUT1"], ["J1", "M1+"]]
+    },
+    {
+      "name": "OUT_A_N",
+      "connections": [["U1", "OUT2"], ["J1", "M1-"]]
+    },
+    {
+      "name": "BYPASS",
+      "connections": [["U1", "VCC"], ["C1", "pos"]]
+    },
+    {
+      "name": "PULLDOWN1",
+      "connections": [["R1", "B"], ["U1", "GND"]]
+    }
+  ]
+}
