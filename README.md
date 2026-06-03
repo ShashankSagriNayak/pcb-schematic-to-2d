@@ -12,7 +12,7 @@ The tool takes a JSON file describing PCB components (type, value, pin connectio
 
 I chose Option B over Option A (image parsing) for a deliberate reason: image-based component detection requires a trained vision model and labeled schematic data, which is well outside a 5-day scope. Option B lets me focus on the core pipeline — parsing, placement, rendering — and produce a result that actually works end-to-end. A smaller, complete implementation is more useful than a broad, broken one.
 
-An optional LLM-powered input mode is also included: you can describe your circuit in plain English and the tool will use the Anthropic API to convert it into the JSON format automatically.
+
 
 ---
 
@@ -42,7 +42,6 @@ pip install -r requirements.txt
 ```
 matplotlib>=3.8
 svgwrite>=1.4
-anthropic>=0.25   # only needed for LLM input mode
 ```
 
 ---
@@ -55,14 +54,8 @@ anthropic>=0.25   # only needed for LLM input mode
 python run.py --input examples/led_blink.json --output output/led_blink.svg
 ```
 
-### Option 2 — Natural language input (requires Anthropic API key)
 
-```bash
-export ANTHROPIC_API_KEY=your_key_here
-python run.py --text "a simple LED blink circuit with a 330 ohm resistor, an LED, and a microcontroller" --output output/led_blink.svg
-```
-
-### Option 3 — Run all examples at once
+### Option 2 — Run all examples at once
 
 ```bash
 python run.py --all-examples
@@ -159,7 +152,7 @@ pcb-schematic-to-2d/
 │   ├── placer.py           # grid-based component placement algorithm
 │   ├── router.py           # trace routing between net connections
 │   ├── renderer.py         # SVG output generation (svgwrite)
-│   └── llm_input.py        # optional: natural language → JSON via Anthropic API
+│   
 │
 ├── examples/
 │   ├── led_blink.json
@@ -176,8 +169,7 @@ Every function in `src/` has full type hints on all arguments and return values,
 ## Architecture
 
 ```
-Text description (optional)
-        ↓  [llm_input.py — Anthropic API]
+
 JSON component file
         ↓  [parser.py]
 Internal model: List[Component], List[Net]
@@ -189,7 +181,7 @@ Trace paths between pin pairs
 SVG output file
 ```
 
-The LLM step is entirely optional and isolated in its own module. The rest of the pipeline runs fully offline.
+
 
 ---
 
@@ -200,7 +192,6 @@ The LLM step is entirely optional and isolated in its own module. The rest of th
 - Trace routing between all nets, rendered as colored lines with net labels
 - SVG output with board outline, component symbols, reference designators, values, and net traces
 - All 5 component types rendered with recognizable 2D symbols (not just boxes)
-- LLM natural language → JSON conversion for simple circuit descriptions
 - 3 working example circuits with correct output
 
 ---
@@ -232,9 +223,9 @@ The LLM step is entirely optional and isolated in its own module. The rest of th
 |---|---|---|---|
 | matplotlib | ≥3.8 | PSF/BSD | rendering component symbols |
 | svgwrite | ≥1.4 | MIT | SVG file generation |
-| anthropic | ≥0.25 | MIT | LLM input mode (optional) |
 
-No API keys are included in the repository. Set `ANTHROPIC_API_KEY` as an environment variable if using LLM mode.
+
+
 
 ---
 

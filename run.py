@@ -4,7 +4,6 @@ Main entry point for the PCB schematic to 2D drawing tool.
 
 Usage:
   python run.py --input examples/led_blink.json --output output/led_blink.svg
-  python run.py --text "a 555 timer circuit with two resistors and a capacitor"
   python run.py --all-examples
 """
 
@@ -42,41 +41,6 @@ def run_from_json(input_path: str, output_path: str) -> None:
     run_pipeline(circuit, output_path)
 
 
-def run_from_text(description: str, output_path: str) -> None:
-    from src.llm_input import text_to_json, save_json
-
-    print("\n[1/4] sending description to Claude API...")
-    data = text_to_json(description)
-
-    # save generated JSON alongside output for inspection
-    json_path = output_path.replace(".svg", "_generated.json")
-    save_json(data, json_path)
-    print(f"[2/4] generated JSON saved → {json_path}")
-
-    print(f"[3/4] placing components")
-    from src.parser import Board, Component, Net, Circuit as C
-    b = data.get("board", {})
-    board = Board(
-        width_mm=float(b.get("width_mm", 80)),
-        height_mm=float(b.get("height_mm", 55)),
-        title=str(b.get("title", "Generated Circuit")),
-    )
-    from src.parser import SUPPORTED_TYPES
-    components = []
-    for c in data.get("components", []):
-        if c["type"].lower() in SUPPORTED_TYPES:
-            components.append(Component(
-                id=c["id"], type=c["type"].lower(),
-                value=c.get("value", ""), pins=c.get("pins", []),
-            ))
-    nets = [
-        Net(name=n["name"],
-            connections=[(cn[0], cn[1]) for cn in n.get("connections", [])])
-        for n in data.get("nets", [])
-    ]
-    circuit = C(board=board, components=components, nets=nets)
-    print(f"[4/4] rendering → {output_path}")
-    run_pipeline(circuit, output_path)
 
 
 def run_all_examples() -> None:
@@ -98,8 +62,7 @@ def main() -> None:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--input", metavar="JSON",
                        help="path to a circuit JSON file")
-    group.add_argument("--text", metavar="DESCRIPTION",
-                       help="plain-English circuit description (requires ANTHROPIC_API_KEY)")
+    
     group.add_argument("--all-examples", action="store_true",
                        help="run all JSON files in examples/ and save to output/")
 
@@ -113,8 +76,7 @@ def main() -> None:
         run_all_examples()
     elif args.input:
         run_from_json(args.input, args.output)
-    elif args.text:
-        run_from_text(args.text, args.output)
+    
 
 
 if __name__ == "__main__":
