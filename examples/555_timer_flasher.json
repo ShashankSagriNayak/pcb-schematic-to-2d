@@ -1,0 +1,87 @@
+{
+  "board": {
+    "width_mm": 70,
+    "height_mm": 50,
+    "title": "555 Timer — Astable LED Flasher"
+  },
+  "components": [
+    {
+      "id": "U1",
+      "type": "ic",
+      "value": "NE555",
+      "pins": ["VCC", "GND", "OUT", "RST", "CV", "THR", "TRG", "DIS"]
+    },
+    {
+      "id": "R1",
+      "type": "resistor",
+      "value": "47k",
+      "pins": ["A", "B"]
+    },
+    {
+      "id": "R2",
+      "type": "resistor",
+      "value": "47k",
+      "pins": ["A", "B"]
+    },
+    {
+      "id": "R3",
+      "type": "resistor",
+      "value": "470R",
+      "pins": ["A", "B"]
+    },
+    {
+      "id": "C1",
+      "type": "capacitor",
+      "value": "10uF",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "C2",
+      "type": "capacitor",
+      "value": "10nF",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "D1",
+      "type": "led",
+      "value": "LED-YLW",
+      "pins": ["anode", "cathode"]
+    },
+    {
+      "id": "J1",
+      "type": "connector",
+      "value": "PWR-9V",
+      "pins": ["VCC", "GND"]
+    }
+  ],
+  "nets": [
+    {
+      "name": "VCC",
+      "connections": [["J1", "VCC"], ["U1", "VCC"], ["U1", "RST"], ["R1", "A"]]
+    },
+    {
+      "name": "GND",
+      "connections": [["J1", "GND"], ["U1", "GND"], ["C1", "neg"], ["C2", "neg"], ["D1", "cathode"]]
+    },
+    {
+      "name": "RA_RB",
+      "connections": [["R1", "B"], ["R2", "A"], ["U1", "DIS"]]
+    },
+    {
+      "name": "THRESH",
+      "connections": [["R2", "B"], ["U1", "THR"], ["U1", "TRG"], ["C1", "pos"]]
+    },
+    {
+      "name": "CV_BYPASS",
+      "connections": [["U1", "CV"], ["C2", "pos"]]
+    },
+    {
+      "name": "OUT_LINE",
+      "connections": [["U1", "OUT"], ["R3", "A"]]
+    },
+    {
+      "name": "LED_DRIVE",
+      "connections": [["R3", "B"], ["D1", "anode"]]
+    }
+  ]
+}

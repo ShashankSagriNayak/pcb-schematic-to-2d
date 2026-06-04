@@ -1,0 +1,133 @@
+{
+  "board": {
+    "width_mm": 85,
+    "height_mm": 60,
+    "title": "ESP32 DevKit — Breakout Board"
+  },
+  "components": [
+    {
+      "id": "U1",
+      "type": "ic",
+      "value": "ESP32-WROOM",
+      "pins": ["VCC", "GND", "EN", "GPIO0", "GPIO2", "GPIO4", "GPIO5", "TX0", "RX0", "GPIO12", "GPIO13", "GPIO14"]
+    },
+    {
+      "id": "U2",
+      "type": "ic",
+      "value": "CP2102",
+      "pins": ["VCC", "GND", "TXD", "RXD", "DTR", "RTS"]
+    },
+    {
+      "id": "U3",
+      "type": "ic",
+      "value": "AMS1117-3.3",
+      "pins": ["IN", "OUT", "GND"]
+    },
+    {
+      "id": "C1",
+      "type": "capacitor",
+      "value": "10uF",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "C2",
+      "type": "capacitor",
+      "value": "100nF",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "C3",
+      "type": "capacitor",
+      "value": "100nF",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "R1",
+      "type": "resistor",
+      "value": "10k",
+      "pins": ["A", "B"]
+    },
+    {
+      "id": "R2",
+      "type": "resistor",
+      "value": "10k",
+      "pins": ["A", "B"]
+    },
+    {
+      "id": "D1",
+      "type": "led",
+      "value": "PWR-LED",
+      "pins": ["anode", "cathode"]
+    },
+    {
+      "id": "R3",
+      "type": "resistor",
+      "value": "470R",
+      "pins": ["A", "B"]
+    },
+    {
+      "id": "J1",
+      "type": "connector",
+      "value": "Micro-USB",
+      "pins": ["VBUS", "D-", "D+", "GND"]
+    },
+    {
+      "id": "J2",
+      "type": "connector",
+      "value": "GPIO-HDR-L",
+      "pins": ["3V3", "GND", "GPIO4", "GPIO5", "GPIO12", "GPIO13", "GPIO14"]
+    },
+    {
+      "id": "J3",
+      "type": "connector",
+      "value": "GPIO-HDR-R",
+      "pins": ["VIN", "GND", "GPIO0", "GPIO2", "TX", "RX", "EN"]
+    }
+  ],
+  "nets": [
+    {
+      "name": "VBUS_5V",
+      "connections": [["J1", "VBUS"], ["U3", "IN"], ["C1", "pos"]]
+    },
+    {
+      "name": "3V3",
+      "connections": [["U3", "OUT"], ["U1", "VCC"], ["U2", "VCC"], ["C2", "pos"], ["C3", "pos"], ["R1", "A"], ["R2", "A"], ["R3", "A"], ["J2", "3V3"]]
+    },
+    {
+      "name": "GND",
+      "connections": [["J1", "GND"], ["U1", "GND"], ["U2", "GND"], ["U3", "GND"], ["C1", "neg"], ["C2", "neg"], ["C3", "neg"], ["D1", "cathode"], ["J2", "GND"], ["J3", "GND"]]
+    },
+    {
+      "name": "UART0_TX",
+      "connections": [["U1", "TX0"], ["U2", "RXD"]]
+    },
+    {
+      "name": "UART0_RX",
+      "connections": [["U1", "RX0"], ["U2", "TXD"]]
+    },
+    {
+      "name": "USB_DP",
+      "connections": [["J1", "D+"], ["U2", "TXD"]]
+    },
+    {
+      "name": "USB_DM",
+      "connections": [["J1", "D-"], ["U2", "RXD"]]
+    },
+    {
+      "name": "EN_PULLUP",
+      "connections": [["R1", "B"], ["U1", "EN"], ["J3", "EN"]]
+    },
+    {
+      "name": "GPIO0_BOOT",
+      "connections": [["R2", "B"], ["U1", "GPIO0"], ["J3", "GPIO0"]]
+    },
+    {
+      "name": "PWR_IND",
+      "connections": [["R3", "B"], ["D1", "anode"]]
+    },
+    {
+      "name": "VIN",
+      "connections": [["J3", "VIN"], ["U3", "IN"]]
+    }
+  ]
+}

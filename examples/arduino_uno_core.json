@@ -1,0 +1,123 @@
+{
+  "board": {
+    "width_mm": 90,
+    "height_mm": 60,
+    "title": "Arduino Uno — Core Section"
+  },
+  "components": [
+    {
+      "id": "U1",
+      "type": "ic",
+      "value": "ATmega328P",
+      "pins": ["VCC", "GND", "AVCC", "AREF", "RXD", "TXD", "PB0", "PB1", "PB2", "PB3", "PB4", "PB5"]
+    },
+    {
+      "id": "U2",
+      "type": "ic",
+      "value": "ATmega16U2",
+      "pins": ["VCC", "GND", "RXD", "TXD", "D+", "D-"]
+    },
+    {
+      "id": "X1",
+      "type": "ic",
+      "value": "16MHz XTAL",
+      "pins": ["XIN", "XOUT", "GND"]
+    },
+    {
+      "id": "C1",
+      "type": "capacitor",
+      "value": "22pF",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "C2",
+      "type": "capacitor",
+      "value": "22pF",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "C3",
+      "type": "capacitor",
+      "value": "100nF",
+      "pins": ["pos", "neg"]
+    },
+    {
+      "id": "R1",
+      "type": "resistor",
+      "value": "1k",
+      "pins": ["A", "B"]
+    },
+    {
+      "id": "D1",
+      "type": "led",
+      "value": "TX-LED",
+      "pins": ["anode", "cathode"]
+    },
+    {
+      "id": "D2",
+      "type": "led",
+      "value": "RX-LED",
+      "pins": ["anode", "cathode"]
+    },
+    {
+      "id": "J1",
+      "type": "connector",
+      "value": "USB-B",
+      "pins": ["VBUS", "D-", "D+", "GND"]
+    },
+    {
+      "id": "J2",
+      "type": "connector",
+      "value": "DIGITAL-IO",
+      "pins": ["D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7"]
+    },
+    {
+      "id": "J3",
+      "type": "connector",
+      "value": "ANALOG-IN",
+      "pins": ["A0", "A1", "A2", "A3", "A4", "A5"]
+    }
+  ],
+  "nets": [
+    {
+      "name": "VCC",
+      "connections": [["U1", "VCC"], ["U1", "AVCC"], ["U2", "VCC"], ["C3", "pos"], ["X1", "VCC"]]
+    },
+    {
+      "name": "GND",
+      "connections": [["U1", "GND"], ["U2", "GND"], ["C1", "neg"], ["C2", "neg"], ["C3", "neg"], ["X1", "GND"], ["D1", "cathode"], ["D2", "cathode"], ["J1", "GND"]]
+    },
+    {
+      "name": "XTAL1",
+      "connections": [["U1", "PB4"], ["X1", "XIN"], ["C1", "pos"]]
+    },
+    {
+      "name": "XTAL2",
+      "connections": [["U1", "PB5"], ["X1", "XOUT"], ["C2", "pos"]]
+    },
+    {
+      "name": "UART_TX",
+      "connections": [["U1", "TXD"], ["U2", "RXD"], ["R1", "A"]]
+    },
+    {
+      "name": "UART_RX",
+      "connections": [["U1", "RXD"], ["U2", "TXD"]]
+    },
+    {
+      "name": "USB_DP",
+      "connections": [["J1", "D+"], ["U2", "D+"]]
+    },
+    {
+      "name": "USB_DM",
+      "connections": [["J1", "D-"], ["U2", "D-"]]
+    },
+    {
+      "name": "TX_IND",
+      "connections": [["R1", "B"], ["D1", "anode"]]
+    },
+    {
+      "name": "USB_VBUS",
+      "connections": [["J1", "VBUS"], ["U2", "VCC"]]
+    }
+  ]
+}
