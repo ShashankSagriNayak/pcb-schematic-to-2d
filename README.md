@@ -23,7 +23,6 @@ I chose Option B over Option A (image parsing) for a deliberate reason: image-ba
 - **5 component types supported:** resistor, capacitor, IC (integrated circuit), LED, and connector. Other types are ignored with a warning.
 - **Net connections are pin-to-pin.** Each net in the JSON lists which component pins are connected. The drawing renders a trace between each connected pin pair.
 - **No EDA tool integration.** This does not use KiCad, FreeRouting, or any EDA software. All rendering is done with Python (matplotlib / svgwrite).
-- **LLM mode requires an Anthropic API key.** If no key is provided, the tool falls back to JSON-only mode. The API call is the only online dependency.
 - **Board dimensions default to 80mm × 55mm** (similar to a small Arduino shield). Configurable via `config.json`.
 
 ---
@@ -33,7 +32,7 @@ I chose Option B over Option A (image parsing) for a deliberate reason: image-ba
 Requires Python 3.11+.
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/pcb-schematic-to-2d
+git clone https://github.com/ShashankSagriNayak/pcb-schematic-to-2d
 cd pcb-schematic-to-2d
 pip install -r requirements.txt
 ```
@@ -202,7 +201,6 @@ SVG output file
 - **No design rule checking (DRC).** The tool does not validate minimum trace widths, clearances, or pad sizes. These are critical in real PCB design but require EDA-grade tooling.
 - **Placement is grid-based, not optimized.** Components are placed in reading order on a grid. A real placer minimizes wire length using heuristics or simulated annealing. The current approach can produce longer traces than necessary.
 - **Single layer only.** Real PCBs use 2–16 layers to route complex designs. This tool renders everything on one layer, which would be unroutable for a board with more than ~15 nets.
-- **LLM input works best for simple circuits.** The Anthropic API prompt is tuned for circuits with 5–10 components. More complex descriptions may produce malformed JSON that the parser rejects.
 - **No image input (Option A not implemented).** Converting a schematic image to a component list requires a trained object detection model and labeled training data. This is a meaningful ML project on its own and was intentionally excluded to keep the scope realistic.
 
 ---
@@ -210,7 +208,7 @@ SVG output file
 ## What I Would Improve With More Time
 
 1. **Smarter routing** — implement a basic Lee algorithm (maze routing) to avoid trace crossings on denser boards.
-2. **Option A image input** — use a vision model (Claude's vision API or a fine-tuned YOLO) to detect component symbols in schematic images, enabling the full image → 2D drawing pipeline.
+2. **Option A image input** — use a vision model (Claude's vision API or a fine-tuned YOLO) to detect component symbols in schematic images, enabling the full image → 2D drawing pipeline.For Option A, the approach would be to fine-tune YOLOv8 on a labeled schematic dataset (e.g. RoboFlow's circuit symbol dataset) to detect component bounding boxes offline, then feed detected component types and positions directly into the existing parser pipeline — replacing the JSON input entirely. The core placer, router and renderer would require zero changes.
 3. **More component types** — transistors, inductors, voltage regulators, crystals.
 4. **Interactive HTML output** — hover over a net to highlight all connected traces and pins, making the drawing more useful for review.
 5. **Placement optimization** — use simulated annealing to minimize total wire length before routing.

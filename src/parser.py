@@ -14,16 +14,17 @@ SUPPORTED_TYPES = {"resistor", "capacitor", "ic", "led", "connector"}
 
 @dataclass
 class Component:
-    id: str           # reference designator, e.g. "R1", "U1"
-    type: str         # one of SUPPORTED_TYPES
-    value: str        # e.g. "330R", "100nF", "ATmega328P"
-    pins: list[str]   # list of pin names
+    id: str              # reference designator e.g. "R1", "U1"
+    type: str            # one of SUPPORTED_TYPES
+    value: str           # e.g. "330R", "100nF", "ATmega328P"
+    pins: list[str]      # list of pin names
+    rotation: int = 0    # 0 or 90 degrees — optional in JSON
 
 
 @dataclass
 class Net:
-    name: str                              # e.g. "GND", "VCC", "LED_LINE"
-    connections: list[tuple[str, str]]     # list of (component_id, pin_name)
+    name: str
+    connections: list[tuple[str, str]]   # [(component_id, pin_name), ...]
 
 
 @dataclass
@@ -43,11 +44,12 @@ class Circuit:
 def parse_json(path: str | Path) -> Circuit:
     """
     Load a circuit JSON file and return a Circuit object.
-    Raises ValueError for unknown component types or missing fields.
+    Raises ValueError for missing required fields.
+    Unknown component types are skipped with a warning.
     """
     raw: dict[str, Any] = json.loads(Path(path).read_text())
 
-    # --- board ---
+    # board
     b = raw.get("board", {})
     board = Board(
         width_mm=float(b.get("width_mm", 80)),
@@ -55,21 +57,26 @@ def parse_json(path: str | Path) -> Circuit:
         title=str(b.get("title", "PCB Layout")),
     )
 
-    # --- components ---
+    # components
     components: list[Component] = []
     for c in raw.get("components", []):
         ctype = str(c["type"]).lower()
         if ctype not in SUPPORTED_TYPES:
-            print(f"  [warning] Unknown component type '{ctype}' for {c['id']} — skipping")
+            print(f"  [warning] Unknown type '{ctype}' for {c['id']} — skipping")
             continue
+        rotation = int(c.get("rotation", 0))
+        if rotation not in (0, 90):
+            print(f"  [warning] rotation must be 0 or 90 for {c['id']} — defaulting to 0")
+            rotation = 0
         components.append(Component(
             id=str(c["id"]),
             type=ctype,
             value=str(c.get("value", "")),
             pins=[str(p) for p in c.get("pins", [])],
+            rotation=rotation,
         ))
 
-    # --- nets ---
+    # nets
     nets: list[Net] = []
     for n in raw.get("nets", []):
         connections = [(str(conn[0]), str(conn[1])) for conn in n.get("connections", [])]
