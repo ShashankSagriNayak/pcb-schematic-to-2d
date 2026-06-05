@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from src.parser import parse_json, Circuit
 from src.placer import place_components
 from src.router import route_nets
-from src.renderer import render_svg
+from src.renderer import render_svg, render_png
 from src.drc import run_drc, print_report
 
 
@@ -147,15 +147,22 @@ def run_pipeline(
     fmt: str = "svg",
     run_drc_check: bool = False,
 ) -> None:
-    """Full pipeline: place → route → render → (drc) → (convert)."""
+    """Full pipeline: place → route → render → (drc)."""
     t0 = time.time()
 
     positions = place_components(circuit)
     traces    = route_nets(circuit, positions)
+
+    # always render SVG (source of truth)
     render_svg(circuit, positions, traces, output_path)
 
-    if fmt in ("png", "pdf"):
-        convert_svg(output_path, fmt)
+    # PNG/PDF: render directly with matplotlib — identical to SVG, no conversion
+    if fmt == "png":
+        png_path = output_path.replace(".svg", ".png")
+        render_png(circuit, positions, traces, png_path)
+    elif fmt == "pdf":
+        pdf_path = output_path.replace(".svg", ".pdf")
+        render_png(circuit, positions, traces, pdf_path)
 
     if run_drc_check:
         report = run_drc(circuit, positions, traces)

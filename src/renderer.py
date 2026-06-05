@@ -232,3 +232,193 @@ def _draw_legend(dwg: svgwrite.Drawing, circuit: Circuit, bw: float, bh: float) 
                          fill=color, opacity=0.85, rx=1))
         dwg.add(dwg.text(net.name[:14], insert=(lx + 10, row_y + 5),
                          fill="#E0E0E0", font_size="5.5px", font_family=FONT))
+
+
+# ---------------------------------------------------------------------------
+# PNG / PDF renderer — draws directly with matplotlib, identical to SVG output
+# ---------------------------------------------------------------------------
+
+def render_png(
+    circuit: Circuit,
+    positions: dict[str, Position],
+    traces: list[Trace],
+    output_path: str,
+    dpi: int = 150,
+) -> None:
+    """
+    Render the PCB drawing directly to PNG or PDF using matplotlib.
+    Produces output identical to the SVG — no SVG-to-image conversion needed.
+    Works on Windows without any system-level Cairo installation.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    from matplotlib.patches import FancyBboxPatch, Circle, FancyArrow
+    from matplotlib.lines import Line2D
+
+    BG   = "#1a1a2e"
+    bw   = circuit.board.width_mm
+    bh   = circuit.board.height_mm
+
+    fig, ax = plt.subplots(figsize=(bw / 25.4 * 2.5, bh / 25.4 * 2.5), dpi=dpi)
+    ax.set_xlim(0, bw)
+    ax.set_ylim(bh, 0)      # flip Y to match SVG (0,0 = top-left)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+
+    # board outline (dashed green border)
+    border = FancyBboxPatch(
+        (2, 2), bw - 4, bh - 4,
+        boxstyle="square,pad=0",
+        facecolor="none", edgecolor="#4CAF50",
+        linewidth=1.5, linestyle=(0, (6, 3)), zorder=1,
+    )
+    ax.add_patch(border)
+
+    # board title
+    ax.text(3, 5.5, circuit.board.title,
+            color="#90CAF9", fontsize=7, fontfamily="monospace",
+            fontweight="bold", va="top", zorder=5)
+
+    # corner mounting holes
+    for cx, cy in [(6, 6), (bw - 6, 6), (6, bh - 6), (bw - 6, bh - 6)]:
+        ax.add_patch(Circle((cx, cy), 1.6, facecolor="none",
+                            edgecolor="#78909C", linewidth=0.8, zorder=2))
+        ax.add_patch(Circle((cx, cy), 0.6, facecolor="#546E7A", zorder=2))
+
+    # traces
+    for trace in traces:
+        pts = trace.points
+        for i in range(len(pts) - 1):
+            x1, y1 = pts[i]
+            x2, y2 = pts[i + 1]
+            ax.plot([x1, x2], [y1, y2],
+                    color=trace.color, linewidth=1.2,
+                    alpha=0.8, solid_capstyle="round", zorder=3)
+        ax.add_patch(Circle(pts[0],  0.9, facecolor=trace.color, zorder=4))
+        ax.add_patch(Circle(pts[-1], 0.9, facecolor=trace.color, zorder=4))
+
+    # components
+    comp_lookup = {c.id: c for c in circuit.components}
+    for comp in circuit.components:
+        pos = positions.get(comp.id)
+        if pos is None:
+            continue
+        _mpl_draw_component(ax, comp, pos)
+
+    # net legend
+    _mpl_draw_legend(ax, circuit, bw, bh)
+
+    fmt = "pdf" if output_path.endswith(".pdf") else "png"
+    plt.savefig(output_path, dpi=dpi, bbox_inches="tight",
+                facecolor=BG, format=fmt)
+    plt.close(fig)
+    print(f"  [ok] {'PDF' if fmt == 'pdf' else 'PNG'} saved → {output_path}")
+
+
+def _mpl_draw_component(ax, comp: Component, pos: Position) -> None:
+    """Draw one component onto a matplotlib axes."""
+    from matplotlib.patches import FancyBboxPatch, Circle, Rectangle
+    from src.placer import get_effective_size
+
+    w, h = get_effective_size(comp)
+    x, y = pos.x, pos.y
+
+    COLORS = {
+        "resistor":  ("#FFF176", "#F9A825"),
+        "capacitor": ("#B3E5FC", "#0288D1"),
+        "ic":        ("#212121", "#78909C"),
+        "led":       ("#FF8A65", "#E64A19"),
+        "connector": ("#37474F", "#90A4AE"),
+    }
+    face, edge = COLORS.get(comp.type, ("#444", "#888"))
+
+    # component body
+    ax.add_patch(FancyBboxPatch(
+        (x, y), w, h,
+        boxstyle="round,pad=0.3",
+        facecolor=face, edgecolor=edge,
+        linewidth=0.8, zorder=5,
+    ))
+
+    # type-specific interior details
+    if comp.type == "resistor":
+        mid_y = y + h / 2
+        ax.plot([x + w * 0.15, x + w * 0.85], [mid_y, mid_y],
+                color="#F9A825", linewidth=0.5, zorder=6)
+
+    elif comp.type == "capacitor":
+        mid_x = x + w / 2
+        ax.plot([mid_x - 0.5, mid_x - 0.5], [y + 1, y + h - 1],
+                color="#0288D1", linewidth=1.2, zorder=6)
+        ax.plot([mid_x + 0.5, mid_x + 0.5], [y + 1, y + h - 1],
+                color="#0288D1", linewidth=1.2, zorder=6)
+
+    elif comp.type == "ic":
+        # pin 1 dot
+        ax.add_patch(Circle((x + 1.5, y + 1.5), 0.5,
+                            facecolor="none", edgecolor="#78909C",
+                            linewidth=0.5, zorder=6))
+        # chip name
+        ax.text(x + w / 2, y + h / 2, comp.value[:8],
+                color="#90CAF9", fontsize=4.5, fontfamily="monospace",
+                ha="center", va="center", zorder=6)
+        # pin stubs
+        import math
+        n    = len(comp.pins)
+        half = math.ceil(n / 2)
+        for i in range(half):
+            py = y + (i + 1) * h / (half + 1)
+            ax.plot([x - 1.5, x], [py, py],
+                    color="#B0BEC5", linewidth=0.7, zorder=6)
+        for i in range(n - half):
+            py = y + (i + 1) * h / (n - half + 1)
+            ax.plot([x + w, x + w + 1.5], [py, py],
+                    color="#B0BEC5", linewidth=0.7, zorder=6)
+
+    elif comp.type == "led":
+        ax.add_patch(Circle((x + w / 2, y + h / 2), 0.8,
+                            facecolor="#FFCCBC", zorder=6))
+
+    elif comp.type == "connector":
+        n = len(comp.pins)
+        if n > 0:
+            pin_w = w / (n + 1)
+            for i in range(n):
+                px = x + pin_w * (i + 1) - 0.5
+                ax.add_patch(Rectangle(
+                    (px, y + h * 0.2), 1.0, h * 0.6,
+                    facecolor="#B0BEC5", zorder=6,
+                ))
+
+    # labels
+    ax.text(x + w / 2, y - 1.5, comp.id,
+            color="#E0E0E0", fontsize=4.5, fontfamily="monospace",
+            ha="center", va="bottom", zorder=7)
+    ax.text(x + w / 2, y + h + 1.5, comp.value,
+            color="#BDBDBD", fontsize=4.0, fontfamily="monospace",
+            ha="center", va="top", zorder=7)
+
+
+def _mpl_draw_legend(ax, circuit, bw: float, bh: float) -> None:
+    """Draw net color legend in bottom-right corner."""
+    from src.router import NET_COLORS
+    nets = circuit.nets
+    if not nets:
+        return
+    lx = bw - 22
+    ly = bh - 4 - len(nets) * 3.5
+    ax.text(lx, ly - 1.5, "nets",
+            color="#90CAF9", fontsize=4, fontfamily="monospace", va="top")
+    for i, net in enumerate(nets):
+        color = NET_COLORS[i % len(NET_COLORS)]
+        row_y = ly + i * 3.5
+        from matplotlib.patches import Rectangle
+        ax.add_patch(Rectangle((lx, row_y), 2.5, 1.8,
+                               facecolor=color, alpha=0.9))
+        ax.text(lx + 3.2, row_y + 0.9, net.name[:14],
+                color="#E0E0E0", fontsize=3.5,
+                fontfamily="monospace", va="center")
