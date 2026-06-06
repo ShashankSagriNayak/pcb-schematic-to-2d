@@ -1,35 +1,47 @@
 # PCB Schematic to 2D Drawing
 
-A lightweight Python tool that converts a JSON component description into a structured 2D PCB layout drawing (SVG output). Built as part of the UST Automotive Data Science internship evaluation — June 2026.
+A lightweight, fully offline Python tool that converts a JSON circuit description into a structured 2D PCB layout drawing. Outputs SVG, PNG, and PDF. Built for the UST SEMICON Data Science Internship — June 2026, Problem Statement 3.
 
 ---
 
 ## What I Built
 
-This project implements **Option B**: structured JSON input → 2D board layout drawing.
+This project implements **Option B**: a structured JSON input → 2D board layout drawing pipeline.
 
-The tool takes a JSON file describing PCB components (type, value, pin connections) and automatically places them on a virtual board, routes connection traces between nets, and exports a clean SVG drawing showing component placement and connectivity.
+The tool takes a JSON file describing PCB components (type, value, pin names) and their net connections, automatically places them on a virtual board, routes L-shaped (Manhattan) traces between nets, runs an offline Design Rule Check (DRC), and exports a clean SVG and PNG drawing showing component placement and connectivity.
 
-I chose Option B over Option A (image parsing) for a deliberate reason: image-based component detection requires a trained vision model and labeled schematic data, which is well outside a 5-day scope. Option B lets me focus on the core pipeline — parsing, placement, rendering — and produce a result that actually works end-to-end. A smaller, complete implementation is more useful than a broad, broken one.
+**Why Option B over Option A (image parsing):**
+Option A requires a trained vision model and a labeled schematic dataset — a meaningful ML project on its own that is well outside a 5-day scope. Option B delivers a complete, working end-to-end pipeline that can be verified, extended, and reproduced.
 
+---
 
+## Features
+
+- JSON → SVG + PNG + PDF output, fully offline
+- 5 component types with distinct visual symbols: resistor, capacitor, IC, LED, connector
+- Manhattan (L-shaped) trace routing — no diagonal crossing lines
+- One color per net with a legend
+- Auto-expands board size to fit all components cleanly — no overlaps
+- Component rotation support (`"rotation": 90` in JSON)
+- Offline Design Rule Check (DRC) with a 0–100 quality score
+- 6 built-in real-world circuit examples
 
 ---
 
 ## Assumptions
 
-- **Single-layer board only.** All components and traces are rendered on one layer. Multi-layer representation is out of scope.
-- **Grid-based placement.** Components are placed on a simple grid. No advanced auto-routing algorithm is used — traces are routed as straight lines between component pins, with basic collision avoidance.
-- **5 component types supported:** resistor, capacitor, IC (integrated circuit), LED, and connector. Other types are ignored with a warning.
-- **Net connections are pin-to-pin.** Each net in the JSON lists which component pins are connected. The drawing renders a trace between each connected pin pair.
-- **No EDA tool integration.** This does not use KiCad, FreeRouting, or any EDA software. All rendering is done with Python (matplotlib / svgwrite).
-- **Board dimensions default to 80mm × 55mm** (similar to a small Arduino shield). Configurable via `config.json`.
+- **Single-layer board only.** All components and traces are on one layer. Multi-layer is out of scope.
+- **Grid-based placement.** Components are placed row by row. No advanced auto-routing — traces are Manhattan-routed (horizontal then vertical) with star topology per net.
+- **5 component types supported:** resistor, capacitor, ic, led, connector. Unknown types are skipped with a warning.
+- **Board auto-sizing.** If the JSON specifies a board smaller than needed, the tool expands it automatically to fit all components without overlap.
+- **Fully offline.** No internet connection, no API calls, no cloud dependencies at any stage.
+- **No EDA tool integration.** No KiCad, FreeRouting, or EDA software. All rendering uses Python (svgwrite + matplotlib).
 
 ---
 
 ## Installation
 
-Requires Python 3.11+.
+Requires **Python 3.11+**
 
 ```bash
 git clone https://github.com/ShashankSagriNayak/pcb-schematic-to-2d
@@ -37,30 +49,55 @@ cd pcb-schematic-to-2d
 pip install -r requirements.txt
 ```
 
-`requirements.txt` contains:
+`requirements.txt`:
 ```
 matplotlib>=3.8
 svgwrite>=1.4
+Pillow>=10.0
 ```
+
+No system-level dependencies. Works on Windows, Mac, and Linux.
 
 ---
 
 ## How to Run
 
-### Option 1 — JSON input (fully offline)
-
-```bash
-python run.py --input examples/led_blink.json --output output/led_blink.svg
-```
-
-
-### Option 2 — Run all examples at once
-
+### Run all 6 built-in examples
 ```bash
 python run.py --all-examples
 ```
 
-Output SVGs are saved to the `output/` folder. Open any `.svg` file in a browser to view.
+### Run a single JSON file
+```bash
+python run.py --input examples/led_blink.json
+```
+
+### Export as PNG
+```bash
+python run.py --input examples/led_blink.json --format png
+```
+
+### Export as PDF
+```bash
+python run.py --input examples/led_blink.json --format pdf
+```
+
+### Run with Design Rule Check
+```bash
+python run.py --input examples/led_blink.json --drc
+```
+
+### Specify output path
+```bash
+python run.py --input examples/led_blink.json --output output/my_board.svg
+```
+
+### Full options
+```bash
+python run.py --all-examples --format png --drc
+```
+
+Output files are saved to the `output/` folder.
 
 ---
 
@@ -78,7 +115,8 @@ Output SVGs are saved to the `output/` folder. Open any `.svg` file in a browser
       "id": "U1",
       "type": "ic",
       "value": "ATmega328P",
-      "pins": ["VCC", "GND", "PB5", "PB4"]
+      "pins": ["VCC", "GND", "PB5", "PB4"],
+      "rotation": 0
     },
     {
       "id": "R1",
@@ -89,51 +127,74 @@ Output SVGs are saved to the `output/` folder. Open any `.svg` file in a browser
     {
       "id": "D1",
       "type": "led",
-      "value": "RED",
+      "value": "LED-RED",
       "pins": ["anode", "cathode"]
     }
   ],
   "nets": [
+    { "name": "VCC",      "connections": [["U1", "VCC"], ["R1", "A"]] },
+    { "name": "GND",      "connections": [["U1", "GND"], ["D1", "cathode"]] },
     { "name": "LED_LINE", "connections": [["U1", "PB5"], ["R1", "A"]] },
-    { "name": "LED_CATHODE", "connections": [["R1", "B"], ["D1", "anode"]] },
-    { "name": "GND", "connections": [["U1", "GND"], ["D1", "cathode"]] }
+    { "name": "LED_ANODE","connections": [["R1", "B"],   ["D1", "anode"]] }
   ]
 }
 ```
+
+**Fields:**
+
+| Field | Required | Description |
+|---|---|---|
+| `board.width_mm` | No | Board width in mm (auto-expanded if too small) |
+| `board.height_mm` | No | Board height in mm (auto-expanded if too small) |
+| `board.title` | No | Title shown on the drawing |
+| `component.id` | Yes | Reference designator: R1, C1, U1, D1, J1 |
+| `component.type` | Yes | One of: resistor, capacitor, ic, led, connector |
+| `component.value` | No | Part value or name: "330R", "ATmega328P" |
+| `component.pins` | Yes | List of pin names |
+| `component.rotation` | No | 0 (default) or 90 degrees |
+| `net.name` | Yes | Net label shown in the legend |
+| `net.connections` | Yes | List of `[component_id, pin_name]` pairs |
 
 ---
 
 ## Example Runs
 
-Three examples are included in the `examples/` folder:
+Six real-world inspired circuits are included in `examples/`:
 
-### 1. LED Blink Circuit (`led_blink.json`)
-A microcontroller driving an LED through a current-limiting resistor. Tests basic IC + resistor + LED connectivity.
-
-**Input:** ATmega328P + 330Ω resistor + red LED, 3 nets  
-**Output:** `output/led_blink.svg`
-
-![LED Blink Output](output/led_blink.png)
-
----
-
-### 2. Power Supply Section (`power_supply.json`)
-A 12V to 5V regulator circuit with input/output decoupling capacitors and a power connector.
-
-**Input:** AMS1117-5.0 regulator + 2× capacitors + 1× connector, 4 nets  
-**Output:** `output/power_supply.svg`
-
-![Power Supply Output](output/power_supply.png)
+| File | Circuit | Components | Nets |
+|---|---|---|---|
+| `led_blink.json` | ATmega328P driving an LED | 5 | 4 |
+| `power_supply.json` | AMS1117 12V→5V regulator | 7 | 4 |
+| `motor_driver.json` | L298N H-bridge | 8 | 8 |
+| `555_timer_flasher.json` | NE555 astable LED flasher | 8 | 7 |
+| `arduino_uno_core.json` | Arduino Uno core (ATmega328P + ATmega16U2) | 12 | 10 |
+| `esp32_devkit.json` | ESP32 DevKit (ESP32-WROOM + CP2102 + AMS1117) | 13 | 11 |
 
 ---
 
-### 3. Motor Driver (`motor_driver.json`)
-An H-bridge motor driver with 4 switching transistors, a motor connector, and bypass capacitors.
+## DRC — Design Rule Check
 
-**Input:** 4× resistors + 2× capacitors + 2× connectors + 1 IC, 8 nets  
-**Output:** `output/motor_driver.svg`
+Run with `--drc` to validate the generated layout against 6 offline rules:
 
-![Motor Driver Output](output/motor_driver.png)
+| Rule | Severity | Description |
+|---|---|---|
+| `UNCONNECTED_NET` | Error | Net has fewer than 2 valid connections |
+| `MISSING_COMPONENT` | Error | Net references a component ID not in the list |
+| `OUT_OF_BOUNDS` | Error | Component extends outside board boundary |
+| `COMPONENT_OVERLAP` | Warning | Two components are closer than 2mm clearance |
+| `SHORT_TRACE` | Warning | Trace length is under 1mm |
+| `FLOATING_COMPONENT` | Warning | Component has no net connections at all |
+
+Example output:
+```
+====================================================
+  DRC REPORT
+====================================================
+  No violations found.
+----------------------------------------------------
+  DRC PASS | score: 100/100 | errors: 0 | warnings: 0
+====================================================
+```
 
 ---
 
@@ -144,90 +205,101 @@ pcb-schematic-to-2d/
 │
 ├── run.py                  # entry point — single command to run everything
 ├── requirements.txt
-├── config.json             # default board size, colors, grid spacing
+├── README.md
 │
 ├── src/
-│   ├── parser.py           # JSON → internal component/net model
-│   ├── placer.py           # grid-based component placement algorithm
-│   ├── router.py           # trace routing between net connections
-│   ├── renderer.py         # SVG output generation (svgwrite)
-│   
+│   ├── __init__.py
+│   ├── parser.py           # JSON → typed Circuit / Component / Net model
+│   ├── placer.py           # grid-based placement with auto board sizing
+│   ├── router.py           # Manhattan L-shaped trace routing
+│   ├── renderer.py         # SVG output (svgwrite) + PNG/PDF (matplotlib)
+│   └── drc.py              # offline Design Rule Check, quality score 0–100
 │
 ├── examples/
 │   ├── led_blink.json
 │   ├── power_supply.json
-│   └── motor_driver.json
+│   ├── motor_driver.json
+│   ├── 555_timer_flasher.json
+│   ├── arduino_uno_core.json
+│   └── esp32_devkit.json
 │
-└── output/                 # generated SVGs go here
+└── output/                 # generated SVG, PNG, PDF files
 ```
 
-Every function in `src/` has full type hints on all arguments and return values, per the project requirements.
+Every function in `src/` has full type hints on all arguments and return values.
 
 ---
 
 ## Architecture
 
 ```
-
-JSON component file
-        ↓  [parser.py]
-Internal model: List[Component], List[Net]
-        ↓  [placer.py]
-Component positions on board grid
-        ↓  [router.py]
-Trace paths between pin pairs
-        ↓  [renderer.py]
-SVG output file
+JSON file
+    ↓  [parser.py]
+Circuit model: Board + List[Component] + List[Net]
+    ↓  [placer.py]
+Component positions on auto-sized board grid
+    ↓  [router.py]
+Manhattan traces between net pin pairs
+    ↓  [renderer.py]
+SVG  →  output/board.svg      (svgwrite)
+PNG  →  output/board.png      (matplotlib, direct render)
+PDF  →  output/board.pdf      (matplotlib, direct render)
+    ↓  [drc.py]  (optional --drc flag)
+DRC report + quality score printed to stdout
 ```
 
-
+PNG and PDF are rendered directly from the placement and routing data using matplotlib — not converted from SVG. This means both outputs are always identical to each other.
 
 ---
 
 ## What Works
 
-- JSON parsing with validation and clear error messages for unknown component types
-- Grid-based placement that respects board boundaries and avoids component overlap
-- Trace routing between all nets, rendered as colored lines with net labels
-- SVG output with board outline, component symbols, reference designators, values, and net traces
-- All 5 component types rendered with recognizable 2D symbols (not just boxes)
-- 3 working example circuits with correct output
+- JSON parsing with clear validation errors and warnings for unknown types
+- Auto-sizing board so components never overlap regardless of circuit size
+- Manhattan routing produces clean L-shaped traces with no diagonal crossings
+- Distinct visual symbols for all 5 component types
+- One color per net, consistent across SVG and PNG
+- DRC catches real issues: unconnected nets, missing refs, out-of-bounds, floating components
+- PNG and PDF output that exactly matches the SVG — no Cairo dependency needed on Windows
+- All 6 example circuits run cleanly end-to-end with `python run.py --all-examples`
 
 ---
 
 ## Known Limitations
 
-- **Trace routing is naive.** Traces are drawn as direct lines between pins. On dense boards, traces will visually cross each other. A real PCB router (like FreeRouting) uses constraint-based algorithms to avoid this — that's beyond this scope.
-- **No design rule checking (DRC).** The tool does not validate minimum trace widths, clearances, or pad sizes. These are critical in real PCB design but require EDA-grade tooling.
-- **Placement is grid-based, not optimized.** Components are placed in reading order on a grid. A real placer minimizes wire length using heuristics or simulated annealing. The current approach can produce longer traces than necessary.
-- **Single layer only.** Real PCBs use 2–16 layers to route complex designs. This tool renders everything on one layer, which would be unroutable for a board with more than ~15 nets.
-- **No image input (Option A not implemented).** Converting a schematic image to a component list requires a trained object detection model and labeled training data. This is a meaningful ML project on its own and was intentionally excluded to keep the scope realistic.
+- **Trace routing is star topology.** Every pin connects back to the first pin of the net. A real PCB router uses constraint-based algorithms to minimise wire length and avoid crossings on dense boards.
+- **No auto-routing.** Traces are Manhattan-routed but not optimised — on very dense boards some traces will still visually cross. FreeRouting or a Lee maze algorithm would fix this.
+- **Single layer only.** All components and traces are on one layer. Real PCBs use 2–16 layers for complex designs.
+- **No DRC on trace clearance.** The DRC checks component spacing but does not validate trace-to-trace or trace-to-pad clearance, which requires EDA-grade tooling.
+- **Option A not implemented.** Converting a schematic image to a component list requires a trained object detection model (e.g. fine-tuned YOLOv8 on a labeled schematic dataset). The existing pipeline would accept the output of such a model directly via the JSON format — the placer, router, and renderer require zero changes.
+- **5 component types only.** Transistors, inductors, crystals, and other types are not yet supported.
 
 ---
 
 ## What I Would Improve With More Time
 
-1. **Smarter routing** — implement a basic Lee algorithm (maze routing) to avoid trace crossings on denser boards.
-2. **Option A image input** — use a vision model (Claude's vision API or a fine-tuned YOLO) to detect component symbols in schematic images, enabling the full image → 2D drawing pipeline.For Option A, the approach would be to fine-tune YOLOv8 on a labeled schematic dataset (e.g. RoboFlow's circuit symbol dataset) to detect component bounding boxes offline, then feed detected component types and positions directly into the existing parser pipeline — replacing the JSON input entirely. The core placer, router and renderer would require zero changes.
-3. **More component types** — transistors, inductors, voltage regulators, crystals.
-4. **Interactive HTML output** — hover over a net to highlight all connected traces and pins, making the drawing more useful for review.
-5. **Placement optimization** — use simulated annealing to minimize total wire length before routing.
+1. **Lee maze router** — replace star topology with a proper grid-based router to eliminate all trace crossings on dense boards.
+2. **Option A image input** — fine-tune YOLOv8 on a labeled schematic dataset (e.g. RoboFlow circuit symbol dataset) to detect component bounding boxes offline, feeding detected types and positions directly into the existing parser.
+3. **More component types** — transistors (BJT/MOSFET), inductors, voltage regulators, crystals, fuses.
+4. **KiCad `.kicad_pcb` export** — use the `pcbnew` Python API (bundled with KiCad 6+) to export a real editable PCB file with proper footprints from the KiCad standard library.
+5. **Interactive HTML output** — hover over a net to highlight all connected traces and pins.
 
 ---
 
-## Dependencies and Licenses
+## Dependencies
 
 | Library | Version | License | Used for |
 |---|---|---|---|
-| matplotlib | ≥3.8 | PSF/BSD | rendering component symbols |
+| matplotlib | ≥3.8 | PSF/BSD | PNG and PDF rendering |
 | svgwrite | ≥1.4 | MIT | SVG file generation |
+| Pillow | ≥10.0 | HPND | Image handling support |
 
-
-
+No API keys. No internet connection required. No system-level libraries required on any platform.
 
 ---
 
 ## Author
+Shashank Sagri Nayak
 
-Submitted for UST Automotive Data Science Internship — June 2026  
+Submitted for UST SEMICON Data Science Internship — June 2026
 Problem 3: PCB Schematic to 2D Drawing
