@@ -8,6 +8,7 @@ Usage:
   python run.py --input examples/led_blink.json --format png
   python run.py --input examples/led_blink.json --format pdf
   python run.py --input examples/led_blink.json --drc
+  python run.py --text "a 555 timer with two resistors, a capacitor and an LED"
   python run.py --all-examples
   python run.py --all-examples --format png --drc
 """
@@ -20,125 +21,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.parser import parse_json, Circuit
+from src.parser import parse_json, Circuit, Board, Component, Net
 from src.placer import place_components
 from src.router import route_nets
 from src.renderer import render_svg, render_png
 from src.drc import run_drc, print_report
-
-
-def convert_svg(svg_path: str, fmt: str) -> None:
-    """
-    Convert an SVG to PNG or PDF.
-    Uses matplotlib to re-render the circuit directly — no Cairo, no system
-    dependencies. Works on Windows, Mac, and Linux out of the box.
-    PNG/PDF are rendered by re-running the draw logic, not by converting SVG.
-    """
-    if fmt not in ("png", "pdf"):
-        return
-
-    out_path = svg_path.replace(".svg", f".{fmt}")
-
-    try:
-        import matplotlib
-        matplotlib.use("Agg")   # non-interactive backend, safe on all platforms
-        import matplotlib.pyplot as plt
-        import matplotlib.patches as mpatches
-        from matplotlib.patches import FancyBboxPatch, Circle
-        import xml.etree.ElementTree as ET
-
-        # parse SVG viewBox for correct figure size
-        tree = ET.parse(svg_path)
-        root = tree.getroot()
-        vb = root.get("viewBox", "0 0 320 220").split()
-        w_px, h_px = float(vb[2]), float(vb[3])
-
-        # create figure with correct aspect ratio
-        dpi = 150
-        fig, ax = plt.subplots(figsize=(w_px / dpi, h_px / dpi), dpi=dpi)
-        ax.set_xlim(0, w_px)
-        ax.set_ylim(h_px, 0)   # invert y to match SVG coordinate system
-        ax.set_aspect("equal")
-        ax.axis("off")
-        fig.patch.set_facecolor("#1a1a2e")
-        ax.set_facecolor("#1a1a2e")
-
-        # draw board outline from SVG rect elements
-        ns = "http://www.w3.org/2000/svg"
-        for elem in root.iter(f"{{{ns}}}rect"):
-            x = float(elem.get("x", 0))
-            y = float(elem.get("y", 0))
-            rw = float(elem.get("width", 0))
-            rh = float(elem.get("height", 0))
-            fill  = elem.get("fill", "none")
-            stroke = elem.get("stroke", "none")
-            sw = float(elem.get("stroke-width", 1))
-            rx = float(elem.get("rx", 0))
-            if fill == "none":
-                fill_c = "none"
-            else:
-                fill_c = fill
-            edgecolor = stroke if stroke != "none" else "none"
-            style = "round,pad=0" if rx > 0 else "square,pad=0"
-            rect = FancyBboxPatch(
-                (x, y), rw, rh,
-                boxstyle=style,
-                facecolor=fill_c, edgecolor=edgecolor,
-                linewidth=sw, zorder=1,
-            )
-            ax.add_patch(rect)
-
-        # draw lines (traces + pin stubs)
-        for elem in root.iter(f"{{{ns}}}line"):
-            x1 = float(elem.get("x1", 0))
-            y1 = float(elem.get("y1", 0))
-            x2 = float(elem.get("x2", 0))
-            y2 = float(elem.get("y2", 0))
-            stroke = elem.get("stroke", "#ffffff")
-            sw = float(elem.get("stroke-width", 1))
-            alpha = float(elem.get("stroke-opacity", 1.0))
-            ax.plot([x1, x2], [y1, y2],
-                    color=stroke, linewidth=sw, alpha=alpha, zorder=2)
-
-        # draw circles (pin dots + mounting holes)
-        for elem in root.iter(f"{{{ns}}}circle"):
-            cx = float(elem.get("cx", 0))
-            cy = float(elem.get("cy", 0))
-            r  = float(elem.get("r",  2))
-            fill   = elem.get("fill",   "none")
-            stroke = elem.get("stroke", "none")
-            sw = float(elem.get("stroke-width", 1))
-            circle = Circle(
-                (cx, cy), r,
-                facecolor=fill if fill != "none" else "none",
-                edgecolor=stroke if stroke != "none" else "none",
-                linewidth=sw, zorder=3,
-            )
-            ax.add_patch(circle)
-
-        # draw text labels
-        for elem in root.iter(f"{{{ns}}}text"):
-            x    = float(elem.get("x", 0))
-            y    = float(elem.get("y", 0))
-            fill = elem.get("fill", "#ffffff")
-            fs   = elem.get("font-size", "8px").replace("px", "")
-            text = elem.text or ""
-            anchor = elem.get("text-anchor", "start")
-            ha = {"start": "left", "middle": "center", "end": "right"}.get(anchor, "left")
-            ax.text(x, y, text, color=fill,
-                    fontsize=float(fs) * 0.75,
-                    ha=ha, va="top",
-                    fontfamily="monospace", zorder=4)
-
-        plt.tight_layout(pad=0)
-        plt.savefig(out_path, dpi=dpi, bbox_inches="tight",
-                    facecolor="#1a1a2e", format=fmt)
-        plt.close(fig)
-        print(f"  [ok] {fmt.upper()} saved → {out_path}")
-
-    except Exception as e:
-        print(f"  [warning] Could not convert to {fmt.upper()}: {e}")
-        print(f"            SVG output is still at: {svg_path}")
 
 
 def run_pipeline(
@@ -185,6 +72,63 @@ def run_from_json(
     run_pipeline(circuit, output_path, fmt=fmt, run_drc_check=run_drc_check)
 
 
+def run_from_text(
+    description: str,
+    output_path: str,
+    fmt: str = "svg",
+    run_drc_check: bool = False,
+) -> None:
+    """
+    AI-assisted mode: convert plain-English description to JSON via Claude,
+    then run the standard offline pipeline on the result.
+    Requires ANTHROPIC_API_KEY environment variable.
+    """
+    from src.llm_input import text_to_json, save_json
+    from src.parser import SUPPORTED_TYPES
+    import math
+
+    print(f"\n[1/4] AI input  '{description[:60]}...' " if len(description) > 60
+          else f"\n[1/4] AI input  '{description}'")
+
+    # --- AI step: text → JSON ---
+    data = text_to_json(description)
+
+    # save generated JSON for inspection
+    json_path = output_path.replace(".svg", "_generated.json")
+    save_json(data, json_path)
+
+    # --- parse AI output into Circuit model ---
+    print(f"[2/4] parsing   generated JSON")
+    b = data.get("board", {})
+    board = Board(
+        width_mm=float(b.get("width_mm", 80)),
+        height_mm=float(b.get("height_mm", 55)),
+        title=str(b.get("title", "Generated Circuit")),
+    )
+    components = []
+    for c in data.get("components", []):
+        if c.get("type", "").lower() in SUPPORTED_TYPES:
+            components.append(Component(
+                id=str(c["id"]),
+                type=str(c["type"]).lower(),
+                value=str(c.get("value", "")),
+                pins=[str(p) for p in c.get("pins", [])],
+                rotation=int(c.get("rotation", 0)),
+            ))
+    nets = [
+        Net(
+            name=str(n["name"]),
+            connections=[(str(cn[0]), str(cn[1])) for cn in n.get("connections", [])],
+        )
+        for n in data.get("nets", [])
+    ]
+    circuit = Circuit(board=board, components=components, nets=nets)
+
+    print(f"[3/4] placing   {len(circuit.components)} components")
+    print(f"[4/4] rendering → {output_path}")
+    run_pipeline(circuit, output_path, fmt=fmt, run_drc_check=run_drc_check)
+
+
 def run_all_examples(fmt: str = "svg", run_drc_check: bool = False) -> None:
     examples_dir = Path("examples")
     output_dir   = Path("output")
@@ -206,20 +150,21 @@ def main() -> None:
     )
 
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--input",       metavar="JSON",
-                       help="path to a circuit JSON file")
+    group.add_argument("--input",        metavar="JSON",
+                       help="path to a circuit JSON file (offline)")
+    group.add_argument("--text",         metavar="DESCRIPTION",
+                       help="plain-English circuit description — uses Claude API "
+                            "(set ANTHROPIC_API_KEY)")
     group.add_argument("--all-examples", action="store_true",
                        help="run all JSON files in examples/ and save to output/")
 
     parser.add_argument("--output", metavar="PATH",
                         default="output/circuit.svg",
-                        help="output file path (default: output/circuit.svg)")
-
+                        help="output SVG path (default: output/circuit.svg)")
     parser.add_argument("--format", metavar="FMT",
                         choices=["svg", "png", "pdf"],
                         default="svg",
                         help="output format: svg (default), png, or pdf")
-
     parser.add_argument("--drc", action="store_true",
                         help="run Design Rule Check after rendering")
 
@@ -231,6 +176,11 @@ def main() -> None:
     elif args.input:
         run_from_json(
             args.input, args.output,
+            fmt=args.format, run_drc_check=args.drc,
+        )
+    elif args.text:
+        run_from_text(
+            args.text, args.output,
             fmt=args.format, run_drc_check=args.drc,
         )
 
